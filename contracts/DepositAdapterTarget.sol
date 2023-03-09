@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.18;
 
-import "./utils/AccessControl.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IHandler.sol";
 import "./interfaces/IDepositContract.sol";
 import "./interfaces/IDepositAdapterTarget.sol";
@@ -9,7 +9,7 @@ import "./interfaces/IDepositAdapterTarget.sol";
 /**
     @title Makes deposits to Goerli deposit contract.
     @author ChainSafe Systems.
-    @notice This contract is intended to be used with the Bridge contract and Generic handler.
+    @notice This contract is intended to be used with the Bridge contract and PermissionlessGenericHandler.
  */
 contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
     address payable public immutable _depositContract;
@@ -37,16 +37,13 @@ contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
     }
 
     modifier onlyHandler() {
-        _onlyHandler();
-        _;
-    }
-
-    function _onlyHandler() private view {
         require(msg.sender == _handlerAddress, "DepositTarget: sender must be handler contract");
+        _;
     }
 
     /**
         @param handlerAddress Contract address of previously deployed generic handler.
+        @param depositContract Address of the DepositContract.
      */
     constructor(address handlerAddress, address payable depositContract) {
         _handlerAddress = handlerAddress;
@@ -66,6 +63,12 @@ contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
         emit DepositAdapterOriginChanged(depositAdapterOrigin);
     }
 
+    /**
+        @notice Executes the deposit.
+        @notice Only callable by handler.
+        @param originDepositor The depositor from the origin chain.
+        @param depositData Data for the deposit.
+     */
     function execute(address originDepositor, bytes calldata depositData) external onlyHandler {
         require(originDepositor == _depositAdapterOrigin, "DepositTarget: invalid origin depositor");
 

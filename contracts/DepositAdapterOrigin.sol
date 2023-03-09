@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.18;
 
-import "./utils/AccessControl.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./interfaces/IBridge.sol";
 import "./interfaces/IDepositContract.sol";
 import "./interfaces/IDepositAdapterTarget.sol";
@@ -32,6 +32,7 @@ contract DepositAdapterOrigin is AccessControl {
 
     /**
         @param bridgeAddress Contract address of previously deployed Bridge.
+        @param resourceID ResourceID in the Bridge used to find address of handler to be used for deposit.
      */
     constructor(IBridge bridgeAddress, bytes32 resourceID) {
         _bridgeAddress = bridgeAddress;
@@ -43,7 +44,7 @@ contract DepositAdapterOrigin is AccessControl {
     /**
         @notice Sets new value of the fee.
         @notice Only callable by admin.
-        @param newFee Value {_fee} will be updated to.
+        @param newFee Value {_depositFee} will be updated to.
      */
     function changeFee(uint256 newFee) external onlyAdmin {
         require(_depositFee != newFee, "DepositOrigin: current fee is equal to new fee");
@@ -62,6 +63,14 @@ contract DepositAdapterOrigin is AccessControl {
         emit DepositAdapterTargetChanged(targetDepositAdapter);
     }
 
+    /**
+        @notice Deposits to the Bridge contract using the PermissionlessGenericHandler.
+        @notice Called by the user on the origin chain.
+        @notice Value supplied must be _depositFee + Bridge Fee.
+        @param destinationDomainID ID of chain deposit will be bridged to.
+        @param depositContractCalldata Additional data to be passed to the PermissionlessGenericHandler.
+        @param feeData Additional data to be passed to the fee handler.
+     */
     function deposit(
         uint8 destinationDomainID,
         bytes calldata depositContractCalldata,
@@ -78,24 +87,14 @@ contract DepositAdapterOrigin is AccessControl {
         address depositAdapter = _targetDepositAdapter;
         require(credentials == bytes32(abi.encodePacked(hex"010000000000000000000000", depositAdapter)),
             "DepositOrigin: wrong withdrawal_credentials address");
-        // TODO: deposit to bridge
-        
-    //       maxFee:                       uint256  bytes  0                                                                                           -  32
-    //       len(executeFuncSignature):    uint16   bytes  32                                                                                          -  34
-    //       executeFuncSignature:         bytes    bytes  34                                                                                          -  34 + len(executeFuncSignature)
-    //       len(executeContractAddress):  uint8    bytes  34 + len(executeFuncSignature)                                                              -  35 + len(executeFuncSignature)
-    //       executeContractAddress        bytes    bytes  35 + len(executeFuncSignature)                                                              -  35 + len(executeFuncSignature) + len(executeContractAddress)
-    //       len(executionDataDepositor):  uint8    bytes  35 + len(executeFuncSignature) + len(executeContractAddress)                                -  36 + len(executeFuncSignature) + len(executeContractAddress)
-    //       executionDataDepositor:       bytes    bytes  36 + len(executeFuncSignature) + len(executeContractAddress)                                -  36 + len(executeFuncSignature) + len(executeContractAddress) + len(executionDataDepositor)
-    //       executionData:                bytes    bytes  36 + len(executeFuncSignature) + len(executeContractAddress) + len(executionDataDepositor)  -  END
         bytes memory depositData = abi.encodePacked(
-            uint256(0),
-            uint16(4),
-            IDepositAdapterTarget(address(0)).execute.selector,
-            uint8(20),
-            _targetDepositAdapter,
-            uint8(32),
-            abi.encode(address(this), depositContractCalldata)
+            uint256(0),             // uint256 maxFee
+            uint16(4),              // uint16 len(executeFuncSignature)
+            IDepositAdapterTarget(address(0)).execute.selector, // bytes executeFuncSignature
+            uint8(20),              // uint8 len(executeContractAddress)
+            _targetDepositAdapter,  // bytes executeContractAddress
+            uint8(32),              // uint8 len(executionDataDepositor)
+            abi.encode(address(this), depositContractCalldata) // bytes executionDataDepositor + executionData
         );
         IBridge(_bridgeAddress).deposit{value: msg.value - _depositFee}(destinationDomainID, _resourceID, depositData, feeData);
     }
