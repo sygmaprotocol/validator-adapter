@@ -15,10 +15,11 @@ contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
     address payable public immutable _depositContract;
 
     address public immutable _handlerAddress;
-    address public _depositAdapterOrigin;
+    mapping(address => bool) public originAdapters;
 
-    event DepositAdapterOriginChanged(
-        address newDepositAdapter
+    event DepositAdapterOriginSet(
+        address originAdapter,
+        bool isAdapter
     );
 
     /**
@@ -57,10 +58,9 @@ contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
         @notice Only callable by admin.
         @param depositAdapterOrigin Value {_depositAdapterOrigin} will be updated to.
      */
-    function changeOriginAdapter(address depositAdapterOrigin) external onlyAdmin {
-        require(_depositAdapterOrigin != depositAdapterOrigin, "DepositTarget: new deposit adapter address is equal to old");
-        _depositAdapterOrigin = depositAdapterOrigin;
-        emit DepositAdapterOriginChanged(depositAdapterOrigin);
+    function setOriginAdapter(address depositAdapterOrigin, bool isAdapter) external onlyAdmin {
+        originAdapters[depositAdapterOrigin] = isAdapter;
+        emit DepositAdapterOriginSet(depositAdapterOrigin, isAdapter);
     }
 
     /**
@@ -70,7 +70,7 @@ contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
         @param depositData Data for the deposit.
      */
     function execute(address originDepositor, bytes calldata depositData) external onlyHandler {
-        require(originDepositor == _depositAdapterOrigin, "DepositTarget: invalid origin depositor");
+        require(originAdapters[originDepositor], "DepositTarget: invalid origin depositor");
 
         bytes memory withdrawal_credentials;
         (, withdrawal_credentials, ,) = abi.decode(depositData, (bytes, bytes, bytes, bytes32));
