@@ -58,7 +58,7 @@ describe("DepositAdapterTarget", function () {
       await expect(depositAdapterTargetInstance.setOriginAdapter(newAdapter, false))
       .to.emit(depositAdapterTargetInstance, "DepositAdapterOriginSet")
       .withArgs(newAdapter, false); 
-  expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(false);
+      expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(false);
     });
 
     it("Should NOT set the origin adapter if the sender doesn't have admin rights", async function () {
