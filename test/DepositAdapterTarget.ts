@@ -13,7 +13,7 @@ describe("DepositAdapterTarget", function () {
     const DepositAdapterTargetContract = await ethers.getContractFactory("DepositAdapterTarget");
     const depositAdapterTargetInstance = await DepositAdapterTargetContract.deploy(sender.address, testDepositInstance.address);
 
-    await depositAdapterTargetInstance.changeOriginAdapter(originAddress);
+    await depositAdapterTargetInstance.setOriginAdapter(originAddress, true);
     let tx = {
       to: depositAdapterTargetInstance.address,
       value: ethers.utils.parseEther("32")
@@ -36,32 +36,35 @@ describe("DepositAdapterTarget", function () {
   });
 });
 
-  describe("changeOriginAdapter", function () {
+  describe("setOriginAdapter", function () {
     it("Should set the new origin adapter", async function () {
       const newAdapter = "0xCAfEcAfeCAfECaFeCaFecaFecaFECafECafeCaFe";
       const { depositAdapterTargetInstance } = await loadFixture(deployFixture);
-      await expect(depositAdapterTargetInstance.changeOriginAdapter(newAdapter))
-          .to.emit(depositAdapterTargetInstance, "DepositAdapterOriginChanged")
-          .withArgs(newAdapter); 
-      expect(await depositAdapterTargetInstance._depositAdapterOrigin()).to.equal(newAdapter);
+      expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(false);
+      await expect(depositAdapterTargetInstance.setOriginAdapter(newAdapter, true))
+          .to.emit(depositAdapterTargetInstance, "DepositAdapterOriginSet")
+          .withArgs(newAdapter, true); 
+      expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(true);
     });
 
-    it("Should NOT set the same origin adapter", async function () {
+    it("Should renounce the new origin adapter", async function () {
       const newAdapter = "0xCAfEcAfeCAfECaFeCaFecaFecaFECafECafeCaFe";
       const { depositAdapterTargetInstance } = await loadFixture(deployFixture);
-      await expect(depositAdapterTargetInstance.changeOriginAdapter(newAdapter))
-        .to.emit(depositAdapterTargetInstance, "DepositAdapterOriginChanged")
-        .withArgs(newAdapter); 
-      await expect(depositAdapterTargetInstance.changeOriginAdapter(newAdapter))
-          .to.be.revertedWith(
-            "DepositTarget: new deposit adapter address is equal to old"
-          );
+      expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(false);
+      await expect(depositAdapterTargetInstance.setOriginAdapter(newAdapter, true))
+          .to.emit(depositAdapterTargetInstance, "DepositAdapterOriginSet")
+          .withArgs(newAdapter, true); 
+      expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(true);
+      await expect(depositAdapterTargetInstance.setOriginAdapter(newAdapter, false))
+      .to.emit(depositAdapterTargetInstance, "DepositAdapterOriginSet")
+      .withArgs(newAdapter, false); 
+  expect(await depositAdapterTargetInstance.originAdapters(newAdapter)).to.equal(false);
     });
 
     it("Should NOT set the origin adapter if the sender doesn't have admin rights", async function () {
       const newAdapter = "0xCAfEcAfeCAfECaFeCaFecaFecaFECafECafeCaFe";
       const { otherAccount, depositAdapterTargetInstance } = await loadFixture(deployFixture);
-      await expect(depositAdapterTargetInstance.connect(otherAccount).changeOriginAdapter(newAdapter))
+      await expect(depositAdapterTargetInstance.connect(otherAccount).setOriginAdapter(newAdapter, true))
           .to.be.revertedWith(
             "DepositTarget: sender doesn't have admin role"
           );
