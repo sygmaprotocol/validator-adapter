@@ -94,13 +94,14 @@ contract DepositAdapterTarget is AccessControl, IDepositAdapterTarget {
     }
 
     /**
-        @notice Transfers eth in the contract to the admin.
+        @notice Transfers eth in the contract to the receiver.
+        @param recipient Address to receive eth.
         @param amount Amount to transfer.
      */
-    function withdraw(uint amount) external onlyAdmin {
-        require(address(this).balance >= amount, "Not enough balance");
-        (bool success,) = msg.sender.call{value: amount}("");
-        require(success, "Withdrawal failed");
-        emit Withdrawal(msg.sender, amount);
+    function withdraw(address payable recipient, uint amount) external onlyAdmin {
+        require(address(this).balance >= amount, "DepositTarget: not enough balance");
+        (bool success,) = recipient.call{value: amount}("");
+        require(success, "DepositTarget: withdrawal failed");
+        emit Withdrawal(recipient, amount);
     }
 }

@@ -26,15 +26,15 @@ describe("DepositAdapterTarget", function () {
   describe("constructor", function () {
     it("Should NOT deploy the contract if depositContract has no code", async function () {
       const [sender] = await ethers.getSigners();
-    const testDepositAddress = "0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b";
+      const testDepositAddress = "0xff50ed3d0ec03aC01D4C79aAd74928BFF48a7b2b";
 
-    const DepositAdapterTargetContract = await ethers.getContractFactory("DepositAdapterTarget");
-    await expect(DepositAdapterTargetContract.deploy(sender.address, testDepositAddress))
-    .to.be.revertedWith(
-      "DepositTarget: invalid deposit contract"
-    );
+      const DepositAdapterTargetContract = await ethers.getContractFactory("DepositAdapterTarget");
+      await expect(DepositAdapterTargetContract.deploy(sender.address, testDepositAddress))
+      .to.be.revertedWith(
+        "DepositTarget: invalid deposit contract"
+      );
+    });
   });
-});
 
   describe("setOriginAdapter", function () {
     it("Should set the new origin adapter", async function () {
@@ -168,6 +168,45 @@ describe("DepositAdapterTarget", function () {
         .to.be.revertedWith(
           "DepositTarget: deposit failed"
         );
+    });
+  });
+
+  describe("withdraw", function () {
+    it("Should withdraw eth from the contract", async function () {
+      const { depositAdapterTargetInstance, otherAccount } = await loadFixture(deployFixture);
+      const amount = ethers.utils.parseEther("30");
+      const negAmount = ethers.utils.parseEther("-30");
+      await expect(depositAdapterTargetInstance.withdraw(otherAccount.address, amount))
+        .to.emit(depositAdapterTargetInstance, "Withdrawal")
+        .withArgs(otherAccount.address, amount)
+        .and.to.changeEtherBalances([depositAdapterTargetInstance.address, otherAccount.address], [negAmount, amount]);
+    });
+
+    it("Should NOT withdraw eth if the sender doesn't have admin rights", async function () {
+      const { depositAdapterTargetInstance, otherAccount } = await loadFixture(deployFixture);
+      const amount = ethers.utils.parseEther("30");
+      await expect(depositAdapterTargetInstance.connect(otherAccount).withdraw(otherAccount.address, amount))
+      .to.be.revertedWith(
+        "DepositTarget: sender doesn't have admin role"
+      );
+    });
+
+    it("Should revert if not enough balance", async function () {
+      const { depositAdapterTargetInstance, otherAccount } = await loadFixture(deployFixture);
+      const amount = ethers.utils.parseEther("40");
+      await expect(depositAdapterTargetInstance.withdraw(otherAccount.address, amount))
+      .to.be.revertedWith(
+        "DepositTarget: not enough balance"
+      );
+    });
+
+    it("Should revert if withdrawal fails", async function () {
+      const { depositAdapterTargetInstance, testDepositInstance } = await loadFixture(deployFixture);
+      const amount = ethers.utils.parseEther("30");
+      await expect(depositAdapterTargetInstance.withdraw(testDepositInstance.address, amount))
+      .to.be.revertedWith(
+        "DepositTarget: withdrawal failed"
+      );
     });
   });
 });

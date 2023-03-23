@@ -25,6 +25,16 @@ contract DepositAdapterOrigin is AccessControl {
         address newDepositAdapter
     );
 
+    /**
+        @notice This event is emitted during withdrawal.
+        @param recipient Address that receives the money.
+        @param amount Amount that is distributed.
+     */
+    event Withdrawal(
+        address recipient,
+        uint256 amount
+    );
+
     modifier onlyAdmin() {
         require(hasRole(DEFAULT_ADMIN_ROLE, msg.sender), "DepositOrigin: sender doesn't have admin role");
         _;
@@ -97,5 +107,17 @@ contract DepositAdapterOrigin is AccessControl {
             abi.encode(address(this), depositContractCalldata) // bytes executionDataDepositor + executionData
         );
         IBridge(_bridgeAddress).deposit{value: msg.value - _depositFee}(destinationDomainID, _resourceID, depositData, feeData);
+    }
+
+    /**
+        @notice Transfers eth in the contract to the receiver.
+        @param recipient Address to receive eth.
+        @param amount Amount to transfer.
+     */
+    function withdraw(address payable recipient, uint amount) external onlyAdmin {
+        require(address(this).balance >= amount, "DepositOrigin: not enough balance");
+        (bool success,) = recipient.call{value: amount}("");
+        require(success, "DepositOrigin: withdrawal failed");
+        emit Withdrawal(recipient, amount);
     }
 }
