@@ -153,4 +153,97 @@ describe("DepositAdapterOrigin", function () {
         .to.be.revertedWith("DepositOrigin: wrong withdrawal_credentials address");
     });
   });
+
+  describe("withdraw", function () {
+    async function deployAndDeposit() {
+      const { resourceID, destinationDomainID, targetAddress, depositAdapterOriginInstance, testBridgeInstance } = await loadFixture(deployFixtureWithBridge);
+      const pubkey = "0x123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456";
+      const withdrawal_credentials = "0x010000000000000000000000" + targetAddress.substring(2);
+      const signature = "0x123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456";
+      const deposit_data_root = ethers.utils.formatBytes32String("0x11");
+      const amount = ethers.utils.parseEther("4");
+      const fee = ethers.utils.parseEther("3.2");
+
+      const abiCoder = ethers.utils.defaultAbiCoder;
+      const executionData = abiCoder.encode([ "bytes", "bytes", "bytes", "bytes32" ], [ pubkey, withdrawal_credentials, signature, deposit_data_root ]);
+
+      const DepositAdapterTargetContract = await ethers.getContractFactory("DepositAdapterTarget");
+      const functionSig = DepositAdapterTargetContract.interface.getSighash("execute");
+
+        //   bytes memory depositData = abi.encodePacked(
+        //     uint256(0),
+        //     uint16(4),
+        //     IDepositAdapterTarget(address(0)).execute.selector,
+        //     uint8(20),
+        //     _targetDepositAdapter,
+        //     uint8(32),
+        //     abi.encode(address(this), depositContractCalldata)
+        // );
+
+      const depositData = ethers.utils.hexZeroPad("0x0", 32)
+        + "0004"
+        + functionSig.substring(2)
+        + "14"
+        + targetAddress.toLowerCase().substring(2)
+        + "20"
+        + abiCoder.encode(["address", "bytes"], [depositAdapterOriginInstance.address, executionData]).substring(2);
+
+      await expect(depositAdapterOriginInstance.deposit(
+      destinationDomainID,
+      executionData, "0x", {value: amount}))
+        .to.emit(testBridgeInstance, "Deposit")
+        .withArgs(
+          destinationDomainID,
+          resourceID,
+          1,
+          depositAdapterOriginInstance.address,
+          depositData,
+          "0x")
+          .and.to.changeEtherBalance(depositAdapterOriginInstance.address, fee);
+
+      return { depositAdapterOriginInstance };
+    }
+
+    it("Should withdraw eth from the contract", async function () {
+      const { depositAdapterOriginInstance } = await loadFixture(deployAndDeposit);
+      const [, otherAccount] = await ethers.getSigners();
+      const amount = ethers.utils.parseEther("1");
+      const negAmount = ethers.utils.parseEther("-1");
+      await expect(depositAdapterOriginInstance.withdraw(otherAccount.address, amount))
+        .to.emit(depositAdapterOriginInstance, "Withdrawal")
+        .withArgs(otherAccount.address, amount)
+        .and.to.changeEtherBalances([depositAdapterOriginInstance.address, otherAccount.address], [negAmount, amount]);
+    });
+
+    it("Should NOT withdraw eth if the sender doesn't have admin rights", async function () {
+      const { depositAdapterOriginInstance } = await loadFixture(deployAndDeposit);
+      const [, otherAccount] = await ethers.getSigners();
+      const amount = ethers.utils.parseEther("1");
+      await expect(depositAdapterOriginInstance.connect(otherAccount).withdraw(otherAccount.address, amount))
+      .to.be.revertedWith(
+        "DepositOrigin: sender doesn't have admin role"
+      );
+    });
+
+    it("Should revert if not enough balance", async function () {
+      const { depositAdapterOriginInstance } = await loadFixture(deployAndDeposit);
+      const [, otherAccount] = await ethers.getSigners();
+      const amount = ethers.utils.parseEther("40");
+      await expect(depositAdapterOriginInstance.withdraw(otherAccount.address, amount))
+      .to.be.revertedWith(
+        "DepositOrigin: not enough balance"
+      );
+    });
+
+    it("Should revert if withdrawal fails", async function () {
+      const { depositAdapterOriginInstance } = await loadFixture(deployAndDeposit);
+      const TestDepositContract = await ethers.getContractFactory("TestDeposit");
+      const testDepositInstance = await TestDepositContract.deploy();
+      const amount = ethers.utils.parseEther("1");
+      await expect(depositAdapterOriginInstance.withdraw(testDepositInstance.address, amount))
+      .to.be.revertedWith(
+        "DepositOrigin: withdrawal failed"
+      );
+    });
+  });
 });
