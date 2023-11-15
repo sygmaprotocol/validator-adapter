@@ -13,11 +13,12 @@ interface IBridge {
         @param resourceID ResourceID used to find address of handler to be used for deposit.
         @param depositData Additional data to be passed to specified handler.
         @param feeData Additional data to be passed to the fee handler.
-        @notice Emits {Deposit} event with all necessary parameters and a handler response.
-        - ERC20Handler: responds with an empty data.
-        - ERC721Handler: responds with the deposited token metadata acquired by calling a tokenURI method in the token contract.
-        - PermissionedGenericHandler: responds with the raw bytes returned from the call to the target contract.
-        - PermissionlessGenericHandler: responds with an empty data.
+        @notice Emits {Deposit} event with all necessary parameters.
      */
-    function deposit(uint8 destinationDomainID, bytes32 resourceID, bytes calldata depositData, bytes calldata feeData) external payable;
+    function deposit(
+        uint8 destinationDomainID,
+        bytes32 resourceID,
+        bytes calldata depositData,
+        bytes calldata feeData
+    ) external payable returns (uint64 depositNonce, bytes memory handlerResponse);
 }

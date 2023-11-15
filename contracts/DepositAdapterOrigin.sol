@@ -103,10 +103,11 @@ contract DepositAdapterOrigin is AccessControl {
             IDepositAdapterTarget(address(0)).execute.selector, // bytes executeFuncSignature
             uint8(20),              // uint8 len(executeContractAddress)
             _targetDepositAdapter,  // bytes executeContractAddress
-            uint8(32),              // uint8 len(executionDataDepositor)
-            abi.encode(address(this), depositContractCalldata) // bytes executionDataDepositor + executionData
+            uint8(20),              // uint8 len(executionDataDepositor)
+            address(this),          // bytes executionDataDepositor
+            prepareDepositData(depositContractCalldata) // bytes executionData
         );
-        IBridge(_bridgeAddress).deposit{value: msg.value - _depositFee}(destinationDomainID, _resourceID, depositData, feeData);
+        _bridgeAddress.deposit{value: msg.value - _depositFee}(destinationDomainID, _resourceID, depositData, feeData);
     }
 
     /**
@@ -119,5 +120,16 @@ contract DepositAdapterOrigin is AccessControl {
         (bool success,) = recipient.call{value: amount}("");
         require(success, "DepositOrigin: withdrawal failed");
         emit Withdrawal(recipient, amount);
+    }
+
+    function slice(bytes calldata input, uint256 position) public pure returns (bytes memory) {
+        return input[position:];
+    }
+
+    function prepareDepositData(
+        bytes calldata depositContractCalldata
+    ) public view returns (bytes memory) {
+        bytes memory encoded = abi.encode(address(0), depositContractCalldata);
+        return this.slice(encoded, 32);
     }
 }
