@@ -3,6 +3,12 @@ pragma solidity ^0.8.18;
 
 import "../interfaces/IBridge.sol";
 
+/*
+    This is a test contract that combines Sygma Bridge and PermissionlessGenericHandler contracts.
+    It simulates a deposit call to the Bridge that use PermissionlessGenericHandler on the origin chain
+    and then simulates executeProposal and performs the target call on the same chain.
+    It allows simulating both origin and target parts of the bridged call on the same chain.
+*/
 contract TestBridge {
     error CallReverted();
 
@@ -15,6 +21,13 @@ contract TestBridge {
         bytes handlerResponse
     );
 
+    /*
+        @notice This is an entry point for the contract.
+        External contracts should call this function and pass the depositData
+        that should be used by the PermissionlessGenericHandler.
+        The contract unpacks the data in the same way as PermissionlessGenericHandler does
+        and then performs the target call.
+    */
     function deposit(
         uint8 destinationDomainID,
         bytes32 resourceID,
@@ -30,7 +43,26 @@ contract TestBridge {
         return (1, bytes("2"));
     }
 
+    /*
+        @notice This function unpacks the data in the same way as PermissionlessGenericHandler
+        and performs the target call.
+        @param resourceID ResourceID (not used in this test contract).
+        @param data Structure should be constructed as follows:
+          maxFee:                             uint256  bytes  0                                                             -  32
+          len(executeFuncSignature):          uint16   bytes  32                                                            -  34
+          executeFuncSignature:               bytes    bytes  34                                                            -  34 + len(executeFuncSignature)
+          len(executeContractAddress):        uint8    bytes  34 + len(executeFuncSignature)                                -  35 + len(executeFuncSignature)
+          executeContractAddress              bytes    bytes  35 + len(executeFuncSignature)                                -  35 + len(executeFuncSignature) + len(executeContractAddress)
+          len(executionDataDepositor):        uint8    bytes  35 + len(executeFuncSignature) + len(executeContractAddress)  -  36 + len(executeFuncSignature) + len(executeContractAddress)
+          executionDataDepositor:             bytes    bytes  36 + len(executeFuncSignature) + len(executeContractAddress)                                -  36 + len(executeFuncSignature) + len(executeContractAddress) + len(executionDataDepositor)
+          executionData:                      bytes    bytes  36 + len(executeFuncSignature) + len(executeContractAddress) + len(executionDataDepositor)  -  END
+
+          executionData is repacked together with executionDataDepositor address for using it in the target contract.
+          If executionData contains dynamic types then it is necessary to keep the offsets correct.
+          executionData should be encoded together with a 32-byte address and then passed as a parameter without that address.
+    */
     function _executeProposal(bytes32 resourceID, bytes calldata data) internal returns (bool success) {
+        uint8 offsetData = 32; // lenth of maxFee
         uint16 lenExecuteFuncSignature;
         bytes4 executeFuncSignature;
         uint8 lenExecuteContractAddress;
@@ -39,33 +71,32 @@ contract TestBridge {
         address executionDataDepositor;
         bytes memory executionData;
 
-        lenExecuteFuncSignature = uint16(bytes2(data[32:34]));
-        executeFuncSignature = bytes4(data[34:34 + lenExecuteFuncSignature]);
-        lenExecuteContractAddress = uint8(bytes1(data[34 + lenExecuteFuncSignature:35 + lenExecuteFuncSignature]));
+        lenExecuteFuncSignature = uint16(bytes2(data[offsetData:offsetData + 2]));
+        executeFuncSignature = bytes4(data[offsetData + 2:offsetData + 2 + lenExecuteFuncSignature]);
+        lenExecuteContractAddress = uint8(bytes1(data[offsetData + 2 + lenExecuteFuncSignature:offsetData + 2 + lenExecuteFuncSignature + 1]));
+        uint16 offsetExecuteContractAddress = offsetData + 2 + lenExecuteFuncSignature + 1;
         executeContractAddress = address(
             uint160(
-                bytes20(data[35 + lenExecuteFuncSignature:35 + lenExecuteFuncSignature + lenExecuteContractAddress])
+                bytes20(data[offsetExecuteContractAddress:offsetExecuteContractAddress + lenExecuteContractAddress])
             )
         );
         lenExecutionDataDepositor = uint8(
             bytes1(
-                data[35 + lenExecuteFuncSignature + lenExecuteContractAddress:36 +
-                    lenExecuteFuncSignature +
-                    lenExecuteContractAddress]
+                data[offsetExecuteContractAddress + lenExecuteContractAddress:
+                    offsetExecuteContractAddress + lenExecuteContractAddress + 1
+                ]
             )
         );
+        uint16 offsetExecutionDataDepositor = offsetExecuteContractAddress + lenExecuteContractAddress + 1;
         executionDataDepositor = address(
             uint160(
                 bytes20(
-                    data[36 + lenExecuteFuncSignature + lenExecuteContractAddress:36 +
-                        lenExecuteFuncSignature +
-                        lenExecuteContractAddress +
-                        lenExecutionDataDepositor]
+                    data[offsetExecutionDataDepositor:offsetExecutionDataDepositor + lenExecutionDataDepositor]
                 )
             )
         );
         executionData = bytes(
-            data[36 + lenExecuteFuncSignature + lenExecuteContractAddress + lenExecutionDataDepositor:]
+            data[offsetExecutionDataDepositor + lenExecutionDataDepositor:]
         );
 
         bytes memory callData = abi.encodePacked(

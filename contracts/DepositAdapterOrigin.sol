@@ -126,6 +126,14 @@ contract DepositAdapterOrigin is AccessControl {
         return input[position:];
     }
 
+
+    /* 
+        After the deposit call to the Bridge, PermissionlessDepositHandler repacks the data and adds the depositor address.
+        When reference types are passed into the adapter,
+        it's necessary to pack them together with some address to get proper offsets,
+        and then the data are passed without the address.
+        The address is verified and added later, in the PermissionlessDepositHandler
+    */
     function prepareDepositData(
         bytes calldata depositContractCalldata
     ) public view returns (bytes memory) {
