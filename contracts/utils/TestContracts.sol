@@ -61,7 +61,7 @@ contract TestBridge {
           If executionData contains dynamic types then it is necessary to keep the offsets correct.
           executionData should be encoded together with a 32-byte address and then passed as a parameter without that address.
     */
-        function _executeProposal(bytes32 resourceID, bytes calldata data) internal returns (bool success) {
+    function _executeProposal(bytes32 resourceID, bytes calldata data) internal returns (bool success) {
         uint16 lenExecuteFuncSignature;
         bytes4 executeFuncSignature;
         uint8 lenExecuteContractAddress;
