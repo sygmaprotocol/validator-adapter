@@ -79,8 +79,9 @@ describe("DepositAdapterOrigin", function () {
         //     IDepositAdapterTarget(address(0)).execute.selector,
         //     uint8(20),
         //     _targetDepositAdapter,
-        //     uint8(32),
-        //     abi.encode(address(this), depositContractCalldata)
+        //     uint8(20),
+        //     address(this)
+        //     depositContractCalldata
         // );
 
       const depositData = ethers.utils.hexZeroPad("0x0", 32)
@@ -88,8 +89,9 @@ describe("DepositAdapterOrigin", function () {
         + functionSig.substring(2)
         + "14"
         + targetAddress.toLowerCase().substring(2)
-        + "20"
-        + abiCoder.encode(["address", "bytes"], [depositAdapterOriginInstance.address, executionData]).substring(2);
+        + "14"
+        + depositAdapterOriginInstance.address.toLowerCase().substring(2)
+        + abiCoder.encode(["address", "bytes"], [ethers.constants.AddressZero, executionData]).substring(66);
 
       await expect(depositAdapterOriginInstance.deposit(
       destinationDomainID,
@@ -176,18 +178,19 @@ describe("DepositAdapterOrigin", function () {
         //     IDepositAdapterTarget(address(0)).execute.selector,
         //     uint8(20),
         //     _targetDepositAdapter,
-        //     uint8(32),
-        //     abi.encode(address(this), depositContractCalldata)
+        //     uint8(20),
+        //     address(this), 
+        //     depositContractCalldata
         // );
-
+        
       const depositData = ethers.utils.hexZeroPad("0x0", 32)
         + "0004"
         + functionSig.substring(2)
         + "14"
         + targetAddress.toLowerCase().substring(2)
-        + "20"
-        + abiCoder.encode(["address", "bytes"], [depositAdapterOriginInstance.address, executionData]).substring(2);
-
+        + "14"
+        + depositAdapterOriginInstance.address.toLowerCase().substring(2)
+        + abiCoder.encode(["address", "bytes"], [ethers.constants.AddressZero, executionData]).substring(66);
       await expect(depositAdapterOriginInstance.deposit(
       destinationDomainID,
       executionData, "0x", {value: amount}))
