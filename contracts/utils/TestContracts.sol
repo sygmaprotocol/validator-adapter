@@ -61,8 +61,7 @@ contract TestBridge {
           If executionData contains dynamic types then it is necessary to keep the offsets correct.
           executionData should be encoded together with a 32-byte address and then passed as a parameter without that address.
     */
-    function _executeProposal(bytes32 resourceID, bytes calldata data) internal returns (bool success) {
-        uint8 offsetData = 32; // lenth of maxFee
+        function _executeProposal(bytes32 resourceID, bytes calldata data) internal returns (bool success) {
         uint16 lenExecuteFuncSignature;
         bytes4 executeFuncSignature;
         uint8 lenExecuteContractAddress;
@@ -70,34 +69,15 @@ contract TestBridge {
         uint8 lenExecutionDataDepositor;
         address executionDataDepositor;
         bytes memory executionData;
+        uint pointer = 32; // lenth of maxFee
 
-        lenExecuteFuncSignature = uint16(bytes2(data[offsetData:offsetData + 2]));
-        executeFuncSignature = bytes4(data[offsetData + 2:offsetData + 2 + lenExecuteFuncSignature]);
-        lenExecuteContractAddress = uint8(bytes1(data[offsetData + 2 + lenExecuteFuncSignature:offsetData + 2 + lenExecuteFuncSignature + 1]));
-        uint16 offsetExecuteContractAddress = offsetData + 2 + lenExecuteFuncSignature + 1;
-        executeContractAddress = address(
-            uint160(
-                bytes20(data[offsetExecuteContractAddress:offsetExecuteContractAddress + lenExecuteContractAddress])
-            )
-        );
-        lenExecutionDataDepositor = uint8(
-            bytes1(
-                data[offsetExecuteContractAddress + lenExecuteContractAddress:
-                    offsetExecuteContractAddress + lenExecuteContractAddress + 1
-                ]
-            )
-        );
-        uint16 offsetExecutionDataDepositor = offsetExecuteContractAddress + lenExecuteContractAddress + 1;
-        executionDataDepositor = address(
-            uint160(
-                bytes20(
-                    data[offsetExecutionDataDepositor:offsetExecutionDataDepositor + lenExecutionDataDepositor]
-                )
-            )
-        );
-        executionData = bytes(
-            data[offsetExecutionDataDepositor + lenExecutionDataDepositor:]
-        );
+        lenExecuteFuncSignature = uint16(bytes2(data[pointer:pointer += 2]));
+        executeFuncSignature = bytes4(data[pointer:pointer += lenExecuteFuncSignature]);
+        lenExecuteContractAddress = uint8(bytes1(data[pointer:pointer += 1]));
+        executeContractAddress = address(uint160(bytes20(data[pointer:pointer += lenExecuteContractAddress])));
+        lenExecutionDataDepositor = uint8(bytes1(data[pointer:pointer += 1]));
+        executionDataDepositor = address(uint160(bytes20(data[pointer:pointer += lenExecutionDataDepositor])));
+        executionData = bytes(data[pointer:]);
 
         bytes memory callData = abi.encodePacked(
             executeFuncSignature,
